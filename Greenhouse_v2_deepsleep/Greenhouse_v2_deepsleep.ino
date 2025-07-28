@@ -5,9 +5,8 @@
 #include <ESP8266HTTPClient.h>
 
 // Wi-Fi credentials
-const char* ssid = "BalintSzoba2";
-const char* password = "@Dri0120";
-
+const char* ssid = "";
+const char* password = "";
 
 // ThingSpeak settings
 const char* apiKey = "182KUICAY3DQXWLA";
@@ -16,7 +15,10 @@ const char* server = "http://api.thingspeak.com/update";
 // Deep sleep time (in microseconds)
 const uint64_t sleepDuration = 5 * 60 * 1e6;  // 5 minutes
 
-// Sensor
+// Pins
+#define FLASH_BUTTON_PIN 0     // GPIO0
+#define LED_PIN 2              // GPIO2 (onboard LED)
+
 Adafruit_BME280 bme;
 
 void setup() {
@@ -24,19 +26,24 @@ void setup() {
   delay(100);
   Serial.println("\nBooting...");
 
-  // Only on cold boot, wait for user
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(FLASH_BUTTON_PIN, INPUT_PULLUP);
+
+  // If cold boot, wait for FLASH button press
   if (ESP.getResetInfoPtr()->reason == REASON_DEFAULT_RST) {
-    Serial.println("Cold boot detected. Press FLASH button to continue...");
-    pinMode(0, INPUT_PULLUP);  // FLASH = GPIO0
-    while (digitalRead(0) == HIGH) {
+    Serial.println("Cold boot detected. Waiting for FLASH button press...");
+
+    digitalWrite(LED_PIN, LOW);  // Turn LED ON
+    while (digitalRead(FLASH_BUTTON_PIN) == HIGH) {
       delay(100);
     }
+    digitalWrite(LED_PIN, HIGH); // Turn LED OFF
     Serial.println("FLASH button pressed. Proceeding...");
   } else {
     Serial.println("Wake from deep sleep. Continuing automatically...");
   }
 
-  // Connect Wi-Fi
+  // Connect to WiFi
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
   unsigned long startAttempt = millis();
@@ -53,14 +60,14 @@ void setup() {
   Serial.println("\nWiFi connected!");
   Serial.println(WiFi.localIP());
 
-  // BME280 Init
+  // BME280 sensor init
   if (!bme.begin(0x76)) {
     Serial.println("BME280 not found!");
     delay(3000);
     goToSleep();
   }
 
-  // Read sensor data
+  // Read data
   float temperature = bme.readTemperature();
   float humidity = bme.readHumidity();
   float pressure = bme.readPressure() / 100.0F;
@@ -71,7 +78,6 @@ void setup() {
   // Send to ThingSpeak
   WiFiClient client;
   HTTPClient http;
-
   String url = String(server) + "?api_key=" + apiKey +
                "&field1=" + String(temperature) +
                "&field2=" + String(humidity) +
@@ -88,7 +94,7 @@ void setup() {
 }
 
 void loop() {
-  // not used
+  // Not used
 }
 
 void goToSleep() {
